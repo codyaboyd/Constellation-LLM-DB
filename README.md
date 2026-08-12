@@ -4,6 +4,8 @@ Constellation is a self-hosted, open source knowledge platform for search, retri
 
 Constellation is designed for teams that want useful, grounded search without sending their knowledge or model requests to a hosted inference service. Embeddings and reranking run locally through Transformers.js and ONNX, and the indexed knowledge stays in local SQLite and LanceDB data files. Once the model cache is populated, it can run with remote model access disabled.
 
+![Alt Text](image.png)
+
 ## Why use Constellation?
 
 Constellation helps you build knowledge-aware applications while keeping the retrieval layer under your control:
