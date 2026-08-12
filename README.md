@@ -164,6 +164,8 @@ bun run dev
 
 ## Using the dashboard
 
+![Alt Text](screenshot.png)
+
 ### Add knowledge
 
 The **Knowledge** screen supports four common workflows:
