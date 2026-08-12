@@ -1,0 +1,24 @@
+{
+  "name": "constellation-knowledge-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.js",
+    "start": "bun src/server.js",
+    "models:prepare": "bun scripts/preload-models.js",
+    "test": "bun test",
+    "check": "bun --check src/server.js"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.6",
+    "@huggingface/transformers": "^3.8.1",
+    "@lancedb/lancedb": "latest",
+    "apache-arrow": "^18.1.0",
+    "cheerio": "latest",
+    "jszip": "^3.10.1",
+    "mammoth": "latest",
+    "pdfjs-dist": "latest",
+    "bootstrap": "^5.3.8"
+  }
+}
