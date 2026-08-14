@@ -1,0 +1,35 @@
+{
+  "name": "@constellation-ai/client",
+  "version": "0.1.0",
+  "description": "A small, dependency-free JavaScript client for the Constellation knowledge API",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "client.js",
+    "errors.js",
+    "models.js",
+    "index.js",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "constellation",
+    "knowledge-base",
+    "rag",
+    "search",
+    "embeddings"
+  ],
+  "license": "MIT"
+}

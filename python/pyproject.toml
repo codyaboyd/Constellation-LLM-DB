@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "constellation-client"
+version = "0.1.0"
+description = "A small, typed Python client for the Constellation knowledge API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Constellation contributors" }]
+keywords = ["constellation", "knowledge-base", "rag", "search", "embeddings"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Typing :: Typed",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["constellation_client*"]
+
+[tool.setuptools.package-data]
+constellation_client = ["py.typed"]
