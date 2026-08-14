@@ -4,8 +4,6 @@ Constellation is a self-hosted, open source knowledge platform for search, retri
 
 Constellation is designed for teams that want useful, grounded search without sending their knowledge or model requests to a hosted inference service. Embeddings and reranking run locally through Transformers.js and ONNX, and the indexed knowledge stays in local SQLite and LanceDB data files. Once the model cache is populated, it can run with remote model access disabled.
 
-![Alt Text](image.png)
-
 ## Why use Constellation?
 
 Constellation helps you build knowledge-aware applications while keeping the retrieval layer under your control:
@@ -166,8 +164,6 @@ bun run dev
 
 ## Using the dashboard
 
-![Alt Text](screenshot.png)
-
 ### Add knowledge
 
 The **Knowledge** screen supports four common workflows:
@@ -236,9 +232,11 @@ The response contains the selected passage text and source metadata, including t
 | `GET /api/models` | Model configuration, readiness, fingerprints, and cache runtime. |
 | `POST /api/models/preload` | Warm the local models. |
 | `GET /api/knowledge` | List indexed documents. |
+| `GET /api/knowledge/:idOrTitle` | Retrieve a document’s reconstructed plain text by ID or exact title. |
 | `POST /api/knowledge/manual` | Ingest a JSON text entry. |
 | `POST /api/knowledge/upload` | Ingest a PDF, DOCX, Markdown, or TXT multipart upload. |
 | `POST /api/knowledge/crawl` | Crawl and ingest bounded web content. |
+| `PUT /api/knowledge/:idOrTitle` | Replace a document’s text by ID or exact title while retaining its ID. |
 | `DELETE /api/knowledge/:id` | Delete a document and its chunks. |
 | `POST /api/query` | Embed a question, search LanceDB, and optionally rerank results. |
 | `POST /api/embeddings` | Create local embeddings for one or more text inputs. |
@@ -271,6 +269,48 @@ curl "$CONSTELLATION_URL/api/rerank" \
     "returnDocuments": true
   }'
 ```
+
+### Python client package
+
+For Python integrations, the repository includes a typed client package that wraps the authenticated API and handles request formatting, multipart uploads, response models, and API errors:
+
+```bash
+pip install ./python
+```
+
+```python
+from constellation_client import Client
+
+client = Client.from_env()
+results = client.query("What is the refund policy?", top_k=5, rerank=True)
+
+for result in results.results:
+    print(result.title, result.text)
+```
+
+`Client` also supports knowledge ingestion, file uploads, crawling, embeddings, reranking, model readiness, index maintenance, and cluster peers. Use `AsyncClient` for asyncio applications. See [`python/README.md`](python/README.md) for installation and integration examples.
+
+### JavaScript client package
+
+For JavaScript and TypeScript integrations, the repository includes a
+dependency-free async client package built on native `fetch`:
+
+```bash
+npm install ./javascript
+```
+
+```js
+import { Client } from "@constellation-ai/client";
+
+const client = Client.fromEnv();
+const context = await client.query("What is the refund policy?", { topK: 5, rerank: true });
+for (const result of context.results) console.log(result.title, result.text);
+```
+
+`Client.fromEnv()` reads `CONSTELLATION_URL` and `CONSTELLATION_API_KEY`. The
+package also exposes ingestion, uploads, crawling, embeddings, reranking,
+document management, model operations, and cluster peer methods. See
+[`javascript/README.md`](javascript/README.md) for the complete usage guide.
 
 ## Local models and offline operation
 

@@ -5,7 +5,7 @@ import { initAuth, createSessionHeaders, clearSessionHeaders, requireAuth, requi
 import { json } from "./util.js";
 import { parseUpload } from "./services/parsers.js";
 import { crawlSite } from "./services/crawler.js";
-import { ingestText, deleteKnowledge, queryKnowledge, knowledgeList, knowledgeChunks, applyReplication, buildDocumentReplicationEvent } from "./services/knowledge.js";
+import { ingestText, replaceKnowledge, deleteKnowledge, queryKnowledge, knowledgeList, knowledgeText, knowledgeChunks, applyReplication, buildDocumentReplicationEvent } from "./services/knowledge.js";
 import { computeEmbed, computeRerank, heartbeatPeers, linkPeer, nodeInfo, normalizePeerPriority, normalizePeerUrl, peers, processReplicationOutbox, replicateToPeer, unlinkPeer } from "./services/cluster.js";
 import { embeddingInfo, warmEmbedding } from "./services/embedding.js";
 import { rerankerInfo, warmReranker } from "./services/rerank.js";
@@ -134,6 +134,25 @@ async function handler(req) {
       for (const page of pages) results.push(await ingestText({ title: page.title, text: page.text, sourceType: "web", sourceUri: page.url, metadata: { crawlRoot: body.url }, chunkSize: body.chunkSize, overlap: body.overlap }));
       return json({ pages: results.length, results }, 201);
     }
+    const documentMatch = pathname.match(/^\/api\/knowledge\/([^/]+)$/);
+    if (req.method === "GET" && documentMatch) {
+      const check = requireAuth(req, auth); if (!check.ok) return denied(check);
+      return json(await knowledgeText(decodeURIComponent(documentMatch[1])));
+    }
+    if (req.method === "PUT" && documentMatch) {
+      const check = requireAuth(req, auth, { mutate: true }); if (!check.ok) return denied(check);
+      const body = await bodyJson(req);
+      if (!String(body.text ?? "").trim()) return json({ error: "text is required" }, 400);
+      return json(await replaceKnowledge(decodeURIComponent(documentMatch[1]), {
+        text: body.text,
+        title: body.title,
+        sourceType: body.sourceType ?? body.source_type,
+        sourceUri: body.sourceUri ?? body.source_uri,
+        metadata: Object.hasOwn(body, "metadata") ? body.metadata : undefined,
+        chunkSize: body.chunkSize,
+        overlap: body.overlap
+      }));
+    }
     const deleteMatch = pathname.match(/^\/api\/knowledge\/([^/]+)$/);
     if (req.method === "DELETE" && deleteMatch) {
       const check = requireAuth(req, auth, { mutate: true }); if (!check.ok) return denied(check);
@@ -200,7 +219,8 @@ async function handler(req) {
     return json({ error: "Not found" }, 404);
   } catch (error) {
     console.error(error);
-    return json({ error: error?.message || "Internal server error" }, 500);
+    const status = Number(error?.status);
+    return json({ error: error?.message || "Internal server error" }, status >= 400 && status < 600 ? status : 500);
   }
 }
 

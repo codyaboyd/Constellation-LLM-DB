@@ -88,6 +88,9 @@ export function upsertDocument(doc) {
 }
 export function listDocuments() { return db.query("SELECT * FROM documents WHERE deleted_at IS NULL ORDER BY created_at DESC").all(); }
 export function getDocument(id) { return db.query("SELECT * FROM documents WHERE id=?").get(id); }
+export function listDocumentsByTitle(title) {
+  return db.query("SELECT * FROM documents WHERE title=? AND deleted_at IS NULL ORDER BY created_at DESC").all(title);
+}
 export function markDocumentDeleted(id) { db.query("UPDATE documents SET deleted_at=?, updated_at=? WHERE id=?").run(nowIso(), nowIso(), id); }
 
 export function upsertPeer(peer) {
