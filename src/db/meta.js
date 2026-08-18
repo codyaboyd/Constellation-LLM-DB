@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
+  table_name TEXT NOT NULL DEFAULT 'knowledge_chunks',
   source_type TEXT NOT NULL,
   source_uri TEXT,
   sha256 TEXT,
@@ -59,6 +60,8 @@ CREATE TABLE IF NOT EXISTS replication_outbox (
 `);
 const peerColumns = new Set(db.query("PRAGMA table_info(peers)").all().map((row) => row.name));
 if (!peerColumns.has("reranker_fingerprint")) db.exec("ALTER TABLE peers ADD COLUMN reranker_fingerprint TEXT");
+const documentColumns = new Set(db.query("PRAGMA table_info(documents)").all().map((row) => row.name));
+if (!documentColumns.has("table_name")) db.exec("ALTER TABLE documents ADD COLUMN table_name TEXT NOT NULL DEFAULT 'knowledge_chunks'");
 
 export function getSetting(key) { return db.query("SELECT value FROM settings WHERE key=?").get(key)?.value ?? null; }
 export function setSetting(key, value) { db.query("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, String(value)); }
@@ -69,11 +72,13 @@ export function upsertDocument(doc) {
   row.title = String(row.title ?? "").trim() || String(row.source_uri ?? "").trim() || "Untitled document";
   row.source_type = String(row.source_type ?? "").trim() || "unknown";
   row.metadata_json = typeof row.metadata_json === "string" ? row.metadata_json : "{}";
-  db.query(`INSERT INTO documents(id,title,source_type,source_uri,sha256,chunk_count,status,origin_node,metadata_json,created_at,updated_at,deleted_at)
-    VALUES($id,$title,$source_type,$source_uri,$sha256,$chunk_count,$status,$origin_node,$metadata_json,$created_at,$updated_at,$deleted_at)
-    ON CONFLICT(id) DO UPDATE SET title=excluded.title,source_type=excluded.source_type,source_uri=excluded.source_uri,sha256=excluded.sha256,chunk_count=excluded.chunk_count,status=excluded.status,origin_node=excluded.origin_node,metadata_json=excluded.metadata_json,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at`).run({
+  row.table_name = String(row.table_name ?? "knowledge_chunks").trim() || "knowledge_chunks";
+  db.query(`INSERT INTO documents(id,title,table_name,source_type,source_uri,sha256,chunk_count,status,origin_node,metadata_json,created_at,updated_at,deleted_at)
+    VALUES($id,$title,$table_name,$source_type,$source_uri,$sha256,$chunk_count,$status,$origin_node,$metadata_json,$created_at,$updated_at,$deleted_at)
+    ON CONFLICT(id) DO UPDATE SET title=excluded.title,table_name=excluded.table_name,source_type=excluded.source_type,source_uri=excluded.source_uri,sha256=excluded.sha256,chunk_count=excluded.chunk_count,status=excluded.status,origin_node=excluded.origin_node,metadata_json=excluded.metadata_json,updated_at=excluded.updated_at,deleted_at=excluded.deleted_at`).run({
       $id: row.id,
       $title: row.title,
+      $table_name: row.table_name,
       $source_type: row.source_type,
       $source_uri: row.source_uri,
       $sha256: row.sha256,
@@ -86,9 +91,13 @@ export function upsertDocument(doc) {
       $deleted_at: row.deleted_at
     });
 }
-export function listDocuments() { return db.query("SELECT * FROM documents WHERE deleted_at IS NULL ORDER BY created_at DESC").all(); }
+export function listDocuments(tableName = null) {
+  if (tableName) return db.query("SELECT * FROM documents WHERE deleted_at IS NULL AND table_name=? ORDER BY created_at DESC").all(tableName);
+  return db.query("SELECT * FROM documents WHERE deleted_at IS NULL ORDER BY created_at DESC").all();
+}
 export function getDocument(id) { return db.query("SELECT * FROM documents WHERE id=?").get(id); }
-export function listDocumentsByTitle(title) {
+export function listDocumentsByTitle(title, tableName = null) {
+  if (tableName) return db.query("SELECT * FROM documents WHERE title=? AND table_name=? AND deleted_at IS NULL ORDER BY created_at DESC").all(title, tableName);
   return db.query("SELECT * FROM documents WHERE title=? AND deleted_at IS NULL ORDER BY created_at DESC").all(title);
 }
 export function markDocumentDeleted(id) { db.query("UPDATE documents SET deleted_at=?, updated_at=? WHERE id=?").run(nowIso(), nowIso(), id); }

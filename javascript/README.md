@@ -37,6 +37,13 @@ for (const result of context.results) {
 `Client.fromEnv()` reads `CONSTELLATION_URL`, defaulting to
 `http://127.0.0.1:4317`, and `CONSTELLATION_API_KEY`.
 
+Use `tableName` for agent-private memory. Omitting it queries and writes the shared `knowledge_chunks` table:
+
+```js
+await client.ingestText("Agent note", "Private context for agent A.", { tableName: "agent_a" });
+const privateContext = await client.query("What is private to agent A?", { tableName: "agent_a" });
+```
+
 ## Common operations
 
 ```js

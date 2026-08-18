@@ -48,6 +48,12 @@ client.ingest_text(
     text="Refunds may be requested within 30 days.",
     metadata={"team": "support"},
 )
+client.ingest_text(
+    title="Agent note",
+    text="Private context for agent A.",
+    table_name="agent_a",
+)
+private_context = client.query("What is private to agent A?", table_name="agent_a")
 client.upload_file(Path("handbook.pdf"))
 
 vectors = client.embed(["first passage", "second passage"])

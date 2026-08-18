@@ -231,6 +231,8 @@ class Client:
         nprobes: int | None = None,
         refine_factor: int | None = None,
         distance_type: str = "cosine",
+        table_name: str | None = None,
+        table: str | None = None,
     ) -> QueryResponse:
         payload: dict[str, Any] = {
             "query": _require_text(query, "query"),
@@ -244,6 +246,7 @@ class Client:
         _optional(payload, "filter", filter)
         _optional(payload, "nprobes", nprobes)
         _optional(payload, "refineFactor", refine_factor)
+        _optional(payload, "tableName", table_name if table_name is not None else table)
         return QueryResponse.from_dict(self._json_request("POST", "/api/query", payload) or {})
 
     search = query
@@ -289,6 +292,12 @@ class Client:
 
     documents = list_documents
 
+    def list_tables(self) -> list[str]:
+        response = self._request("GET", "/api/tables") or {}
+        return [str(value) for value in response.get("tables", [])]
+
+    tables = list_tables
+
     def ingest_text(
         self,
         title: str,
@@ -297,6 +306,8 @@ class Client:
         metadata: Mapping[str, Any] | None = None,
         chunk_size: int | None = None,
         overlap: int | None = None,
+        table_name: str | None = None,
+        table: str | None = None,
     ) -> IngestResult:
         payload: dict[str, Any] = {
             "title": _require_text(title, "title"),
@@ -305,6 +316,7 @@ class Client:
         }
         _optional(payload, "chunkSize", chunk_size)
         _optional(payload, "overlap", overlap)
+        _optional(payload, "tableName", table_name if table_name is not None else table)
         return IngestResult.from_dict(self._json_request("POST", "/api/knowledge/manual", payload) or {})
 
     def upload_file(
@@ -315,6 +327,8 @@ class Client:
         title: str | None = None,
         chunk_size: int | None = None,
         overlap: int | None = None,
+        table_name: str | None = None,
+        table: str | None = None,
     ) -> IngestResult:
         """Upload a PDF, DOCX, Markdown, or TXT file.
 
@@ -353,6 +367,10 @@ class Client:
             fields["chunkSize"] = str(chunk_size)
         if overlap is not None:
             fields["overlap"] = str(overlap)
+        if table_name is not None:
+            fields["tableName"] = table_name
+        elif table is not None:
+            fields["table"] = table
         body, content_type = self._multipart(
             fields,
             {"file": (filename or "document.txt", content, "application/octet-stream")},
@@ -393,12 +411,15 @@ class Client:
         same_origin: bool = True,
         chunk_size: int | None = None,
         overlap: int | None = None,
+        table_name: str | None = None,
+        table: str | None = None,
     ) -> CrawlResponse:
         payload: dict[str, Any] = {"url": _require_text(url, "url"), "sameOrigin": same_origin}
         _optional(payload, "maxPages", max_pages)
         _optional(payload, "maxDepth", max_depth)
         _optional(payload, "chunkSize", chunk_size)
         _optional(payload, "overlap", overlap)
+        _optional(payload, "tableName", table_name if table_name is not None else table)
         return CrawlResponse.from_dict(self._json_request("POST", "/api/knowledge/crawl", payload) or {})
 
     def document_chunks(self, document_id: str) -> DocumentChunks:
@@ -426,6 +447,8 @@ class Client:
         metadata: Mapping[str, Any] | None = None,
         chunk_size: int | None = None,
         overlap: int | None = None,
+        table_name: str | None = None,
+        table: str | None = None,
     ) -> IngestResult:
         identifier = _require_text(identifier, "identifier")
         payload: dict[str, Any] = {"text": _require_text(text, "text")}
@@ -436,6 +459,7 @@ class Client:
             payload["metadata"] = dict(metadata)
         _optional(payload, "chunkSize", chunk_size)
         _optional(payload, "overlap", overlap)
+        _optional(payload, "tableName", table_name if table_name is not None else table)
         return IngestResult.from_dict(self._json_request("PUT", f"/api/knowledge/{quote(identifier, safe='')}", payload) or {})
 
     replace_knowledge = replace_document
@@ -444,8 +468,10 @@ class Client:
         document_id = _require_text(document_id, "document_id")
         return dict(self._request("DELETE", f"/api/knowledge/{quote(document_id, safe='')}") or {})
 
-    def ensure_index(self) -> dict[str, Any]:
-        return dict(self._json_request("POST", "/api/index/ensure") or {})
+    def ensure_index(self, *, table_name: str | None = None, table: str | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        _optional(payload, "tableName", table_name if table_name is not None else table)
+        return dict(self._json_request("POST", "/api/index/ensure", payload) or {})
 
     def list_peers(self) -> list[Peer]:
         response = self._request("GET", "/api/cluster/peers") or {}
@@ -527,6 +553,11 @@ class AsyncClient:
         return await asyncio.to_thread(self._client.list_documents)
 
     documents = list_documents
+
+    async def list_tables(self) -> list[str]:
+        return await asyncio.to_thread(self._client.list_tables)
+
+    tables = list_tables
 
     async def ingest_text(self, *args: Any, **kwargs: Any) -> IngestResult:
         return await asyncio.to_thread(self._client.ingest_text, *args, **kwargs)

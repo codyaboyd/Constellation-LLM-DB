@@ -17,6 +17,9 @@ async function api(path, opts={}){
   const r=await fetch(path,{...opts,method,headers}); const data=await r.json().catch(()=>({})); if(!r.ok) throw new Error(data.error||`HTTP ${r.status}`); return data;
 }
 function showApp(){ $("#loginView").classList.add("d-none"); $("#appView").classList.remove("d-none"); document.body.classList.add("app-ready"); }
+const passwordInput=$("#password");
+const togglePassword=$("#togglePassword");
+togglePassword.addEventListener("click",()=>{const showing=passwordInput.type==="password";passwordInput.type=showing?"text":"password";togglePassword.textContent=showing?"Hide":"Show";togglePassword.setAttribute("aria-label",`${showing?"Hide":"Show"} password`);togglePassword.setAttribute("aria-pressed",String(showing));passwordInput.focus({preventScroll:true})})
 $("#loginForm").addEventListener("submit",async e=>{e.preventDefault();const button=e.submitter||e.target.querySelector("button[type=submit]");showLoader("Opening the constellation");setButtonLoading(button,true);$("#loginError").textContent="";try{const r=await api("/api/auth/login",{method:"POST",body:{password:$("#password").value}});csrf=r.csrf;localStorage.setItem("constellation_csrf",csrf);showApp();await refreshAll()}catch(err){$("#loginError").textContent=err.message}finally{setButtonLoading(button,false);hideLoader()}})
 $("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"}).catch(()=>{});localStorage.removeItem("constellation_csrf");location.reload()}
 $$('[data-tab]').forEach(b=>b.onclick=()=>{$$('[data-tab]').forEach(x=>x.classList.remove("active"));b.classList.add("active");$$('[data-pane]').forEach(p=>p.classList.toggle("d-none",p.dataset.pane!==b.dataset.tab));if(b.dataset.tab==="cluster")loadPeers();if(b.dataset.tab==="knowledge")loadDocs();if(b.dataset.tab==="settings")loadSettings()})

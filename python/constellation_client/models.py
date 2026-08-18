@@ -52,6 +52,7 @@ class Document:
     id: str
     title: str
     source_type: str
+    table_name: str = "knowledge_chunks"
     source_uri: str = ""
     sha256: str | None = None
     chunk_count: int = 0
@@ -68,6 +69,7 @@ class Document:
         return cls(
             id=str(value.get("id") or ""),
             title=str(value.get("title") or ""),
+            table_name=str(value.get("table_name") or value.get("tableName") or "knowledge_chunks"),
             source_type=str(value.get("source_type") or value.get("sourceType") or ""),
             source_uri=str(value.get("source_uri") or value.get("sourceUri") or ""),
             sha256=value.get("sha256"),
@@ -121,11 +123,13 @@ class QueryResult:
 class QueryResponse:
     query: str
     results: list[QueryResult]
+    table_name: str = "knowledge_chunks"
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "QueryResponse":
         return cls(
             query=str(value.get("query") or ""),
+            table_name=str(value.get("table_name") or value.get("tableName") or value.get("table") or "knowledge_chunks"),
             results=[QueryResult.from_dict(item) for item in value.get("results", [])],
         )
 

@@ -29,6 +29,7 @@ export function documentFrom(value) {
   return {
     id: String(raw.id ?? ""),
     title: String(raw.title ?? ""),
+    tableName: String(raw.tableName ?? raw.table_name ?? "knowledge_chunks"),
     sourceType: String(raw.sourceType ?? raw.source_type ?? ""),
     sourceUri: String(raw.sourceUri ?? raw.source_uri ?? ""),
     sha256: raw.sha256 ?? null,
@@ -66,6 +67,7 @@ export function queryResponseFrom(value) {
   const raw = asObject(value);
   return {
     query: String(raw.query ?? ""),
+    tableName: String(raw.tableName ?? raw.table_name ?? raw.table ?? "knowledge_chunks"),
     results: Array.isArray(raw.results) ? raw.results.map(queryResultFrom) : []
   };
 }

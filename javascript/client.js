@@ -183,9 +183,12 @@ export class ConstellationClient {
     nprobes,
     refineFactor,
     distanceType = "cosine",
+    table,
+    tableName,
     ...options
   } = {}) {
     const payload = { query: requireText(query, "query"), topK, candidateK, rerank, distanceType };
+    optional(payload, tableName !== undefined && tableName !== null ? "tableName" : "table", tableName ?? table);
     optional(payload, "rerankTopK", rerankTopK);
     optional(payload, "minScore", minScore);
     optional(payload, "filter", filter);
@@ -223,31 +226,42 @@ export class ConstellationClient {
 
   documents(options) { return this.listDocuments(options); }
 
-  async ingestText(title, text, { metadata = {}, chunkSize, overlap, ...options } = {}) {
+  async listTables(options) {
+    const response = await this.request("GET", "/api/tables", options) || {};
+    return Array.isArray(response.tables) ? response.tables.map(String) : [];
+  }
+
+  tables(options) { return this.listTables(options); }
+
+  async ingestText(title, text, { metadata = {}, chunkSize, overlap, table, tableName, ...options } = {}) {
     const payload = { title: requireText(title, "title"), text: requireText(text, "text"), metadata };
     optional(payload, "chunkSize", chunkSize);
     optional(payload, "overlap", overlap);
+    optional(payload, tableName !== undefined && tableName !== null ? "tableName" : "table", tableName ?? table);
     return ingestResultFrom(await this.jsonRequest("POST", "/api/knowledge/manual", payload, options));
   }
 
-  async uploadFile(file, { filename, title, chunkSize, overlap, ...options } = {}) {
+  async uploadFile(file, { filename, title, chunkSize, overlap, table, tableName, ...options } = {}) {
     if (!canUseFormData()) throw new TypeError("This runtime does not provide FormData");
     const value = await uploadValue(file);
     const form = new FormData();
     if (title !== undefined) form.set("title", String(title));
     if (chunkSize !== undefined) form.set("chunkSize", String(chunkSize));
     if (overlap !== undefined) form.set("overlap", String(overlap));
+    if (tableName !== undefined) form.set("tableName", String(tableName));
+    else if (table !== undefined) form.set("table", String(table));
     const name = filename || await fileNameFor(file, "document.txt");
     form.set("file", value, name);
     return ingestResultFrom(await this.request("POST", "/api/knowledge/upload", { ...options, body: form }));
   }
 
-  async crawl(url, { maxPages, maxDepth, sameOrigin = true, chunkSize, overlap, ...options } = {}) {
+  async crawl(url, { maxPages, maxDepth, sameOrigin = true, chunkSize, overlap, table, tableName, ...options } = {}) {
     const payload = { url: requireText(url, "url"), sameOrigin };
     optional(payload, "maxPages", maxPages);
     optional(payload, "maxDepth", maxDepth);
     optional(payload, "chunkSize", chunkSize);
     optional(payload, "overlap", overlap);
+    optional(payload, tableName !== undefined && tableName !== null ? "tableName" : "table", tableName ?? table);
     return crawlResponseFrom(await this.jsonRequest("POST", "/api/knowledge/crawl", payload, options));
   }
 
@@ -271,6 +285,8 @@ export class ConstellationClient {
     metadata,
     chunkSize,
     overlap,
+    table,
+    tableName,
     ...options
   } = {}) {
     const payload = { text: requireText(text, "text") };
@@ -280,6 +296,7 @@ export class ConstellationClient {
     optional(payload, "metadata", metadata);
     optional(payload, "chunkSize", chunkSize);
     optional(payload, "overlap", overlap);
+    optional(payload, tableName !== undefined && tableName !== null ? "tableName" : "table", tableName ?? table);
     return ingestResultFrom(await this.jsonRequest("PUT", `/api/knowledge/${encodePath(identifier)}`, payload, options));
   }
 
@@ -289,7 +306,11 @@ export class ConstellationClient {
     return this.request("DELETE", `/api/knowledge/${encodePath(documentId)}`, options);
   }
 
-  ensureIndex(options) { return this.jsonRequest("POST", "/api/index/ensure", {}, options); }
+  ensureIndex({ table, tableName, ...options } = {}) {
+    const payload = {};
+    optional(payload, tableName !== undefined && tableName !== null ? "tableName" : "table", tableName ?? table);
+    return this.jsonRequest("POST", "/api/index/ensure", payload, options);
+  }
 
   async listPeers(options) {
     const response = await this.request("GET", "/api/cluster/peers", options) || {};

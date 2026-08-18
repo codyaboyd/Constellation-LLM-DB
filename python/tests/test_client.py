@@ -88,6 +88,20 @@ class ClientTests(unittest.TestCase):
             "filter": "source_type = 'manual'",
         })
 
+    def test_query_and_ingest_can_target_an_independent_table(self):
+        opener = FakeOpener(
+            FakeResponse({"query": "private notes", "table": "agent_memory", "results": []}),
+            FakeResponse({"document": {"id": "doc", "title": "Notes", "table_name": "agent_memory"}, "chunks": 1}, status=201),
+        )
+        client = Client("http://localhost:4317", "secret", opener=opener)
+
+        response = client.query("private notes", table_name="agent_memory", rerank=False)
+        client.ingest_text("Notes", "Only this agent should retrieve these notes.", table="agent_memory")
+
+        self.assertEqual(response.table_name, "agent_memory")
+        self.assertEqual(json.loads(opener.requests[0][0].data)["tableName"], "agent_memory")
+        self.assertEqual(json.loads(opener.requests[1][0].data)["tableName"], "agent_memory")
+
     def test_health_is_public_and_embeddings_have_convenience_shape(self):
         opener = FakeOpener(
             FakeResponse({"ok": True, "role": "standalone"}),

@@ -218,8 +218,24 @@ curl "$CONSTELLATION_URL/api/query" \
     "candidateK": 20,
     "topK": 5,
     "rerank": true
-  }'
+}'
 ```
+
+The shared `knowledge_chunks` table is used when no table is supplied. To give an agent private memory, pass the same table name while ingesting and querying:
+
+```bash
+curl "$CONSTELLATION_URL/api/knowledge/manual" \
+  -H "Authorization: Bearer $CONSTELLATION_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"title":"Agent note","text":"Private context for agent A.","tableName":"agent_a"}'
+
+curl "$CONSTELLATION_URL/api/query" \
+  -H "Authorization: Bearer $CONSTELLATION_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data '{"query":"What is private to agent A?","tableName":"agent_a"}'
+```
+
+Tables are created automatically on the first ingestion. Table names must start with a letter or underscore and contain only letters, numbers, and underscores. `GET /api/tables` lists the tables currently present. The `tableName` field is also accepted by upload and crawl ingestion, and by index maintenance; omitting it always uses the shared table.
 
 The response contains the selected passage text and source metadata, including the document ID, title, source type, source URI, chunk index, and vector/reranker scores when available. Pass those passages to your application’s answer-generation step if you are building a RAG assistant.
 
@@ -239,6 +255,7 @@ The response contains the selected passage text and source metadata, including t
 | `PUT /api/knowledge/:idOrTitle` | Replace a document’s text by ID or exact title while retaining its ID. |
 | `DELETE /api/knowledge/:id` | Delete a document and its chunks. |
 | `POST /api/query` | Embed a question, search LanceDB, and optionally rerank results. |
+| `GET /api/tables` | List the shared and independent vector tables. |
 | `POST /api/embeddings` | Create local embeddings for one or more text inputs. |
 | `POST /api/rerank` | Locally rerank a query against supplied documents. |
 | `POST /api/index/ensure` | Create the LanceDB vector index when the corpus is large enough and no index exists. |

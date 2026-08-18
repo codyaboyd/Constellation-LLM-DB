@@ -67,7 +67,10 @@
     <h1 class="h3 mb-1">Constellation</h1>
     <p class="text-secondary">Knowledge infrastructure for local and distributed LLM systems.</p>
     <label class="form-label">Dashboard password</label>
-    <input id="password" type="password" class="form-control form-control-lg mb-3" required autofocus>
+    <div class="input-group mb-3">
+      <input id="password" type="password" class="form-control form-control-lg" autocomplete="current-password" required autofocus>
+      <button id="togglePassword" class="btn btn-outline-light btn-lg" type="button" aria-controls="password" aria-label="Show password" aria-pressed="false">Show</button>
+    </div>
     <button class="btn btn-primary w-100 btn-lg">Enter constellation</button>
     <div id="loginError" class="small text-danger mt-3"></div>
   </form>

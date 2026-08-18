@@ -5,10 +5,21 @@ import { Field, Schema } from "apache-arrow";
 import { config } from "../config.js";
 import { sqlQuote } from "../util.js";
 
-const TABLE = "knowledge_chunks";
+export const DEFAULT_TABLE_NAME = "knowledge_chunks";
+const TABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 fs.mkdirSync(path.join(config.dataDir, "lancedb"), { recursive: true });
 const connectionPromise = lancedb.connect(path.join(config.dataDir, "lancedb"));
-let tableCache = null;
+const tableCache = new Map();
+
+export function normalizeTableName(value) {
+  const name = String(value ?? "").trim() || DEFAULT_TABLE_NAME;
+  if (name.length > 128 || !TABLE_NAME_PATTERN.test(name)) {
+    const error = new Error("table name must start with a letter or underscore and contain only letters, numbers, and underscores.");
+    error.status = 400;
+    throw error;
+  }
+  return name;
+}
 
 async function connection() { return connectionPromise; }
 
@@ -46,21 +57,29 @@ async function ensurePrimaryKeySchema(table) {
   try { await table.setUnenforcedPrimaryKey("id"); } catch {}
 }
 
-export async function tableExists() { return (await (await connection()).tableNames()).includes(TABLE); }
-export async function getTable() {
-  if (tableCache?.isOpen?.()) return tableCache;
-  if (!(await tableExists())) return null;
-  tableCache = await (await connection()).openTable(TABLE);
-  await ensurePrimaryKeySchema(tableCache);
-  return tableCache;
+export async function listTables() { return (await (await connection()).tableNames()).sort(); }
+export async function tableExists(tableName = DEFAULT_TABLE_NAME) {
+  const name = normalizeTableName(tableName);
+  return (await listTables()).includes(name);
+}
+export async function getTable(tableName = DEFAULT_TABLE_NAME) {
+  const name = normalizeTableName(tableName);
+  const cached = tableCache.get(name);
+  if (cached?.isOpen?.()) return cached;
+  if (!(await tableExists(name))) return null;
+  const table = await (await connection()).openTable(name);
+  await ensurePrimaryKeySchema(table);
+  tableCache.set(name, table);
+  return table;
 }
 
-export async function upsertChunks(rows) {
+export async function upsertChunks(rows, tableName = DEFAULT_TABLE_NAME) {
   if (!rows.length) return;
-  let table = await getTable();
+  const name = normalizeTableName(tableName);
+  let table = await getTable(name);
   if (!table) {
-    table = await (await connection()).createTable(TABLE, rows, { schema: schemaForRows(rows) });
-    tableCache = table;
+    table = await (await connection()).createTable(name, rows, { schema: schemaForRows(rows) });
+    tableCache.set(name, table);
     try { await table.setUnenforcedPrimaryKey("id"); } catch {}
   } else {
     const docIds = [...new Set(rows.map((r) => r.document_id))];
@@ -69,19 +88,19 @@ export async function upsertChunks(rows) {
   }
 }
 
-export async function deleteDocumentChunks(documentId) {
-  const table = await getTable();
+export async function deleteDocumentChunks(documentId, tableName = DEFAULT_TABLE_NAME) {
+  const table = await getTable(tableName);
   if (table) await table.delete(`document_id = ${sqlQuote(documentId)}`);
 }
 
-export async function getDocumentChunks(documentId) {
-  const table = await getTable();
+export async function getDocumentChunks(documentId, tableName = DEFAULT_TABLE_NAME) {
+  const table = await getTable(tableName);
   if (!table) return [];
   return table.query().where(`document_id = ${sqlQuote(documentId)}`).toArray();
 }
 
-export async function getDocumentChunkText(documentId) {
-  const table = await getTable();
+export async function getDocumentChunkText(documentId, tableName = DEFAULT_TABLE_NAME) {
+  const table = await getTable(tableName);
   if (!table) return [];
   return table.query()
     .where(`document_id = ${sqlQuote(documentId)}`)
@@ -90,13 +109,14 @@ export async function getDocumentChunkText(documentId) {
 }
 
 export async function retrieveVector(vector, {
+  tableName = DEFAULT_TABLE_NAME,
   candidateK = 20,
   filter = "",
   nprobes = null,
   refineFactor = null,
   distanceType = "cosine"
 } = {}) {
-  const table = await getTable();
+  const table = await getTable(tableName);
   if (!table) return [];
   let query = table.vectorSearch(vector).distanceType(distanceType).limit(Math.max(1, Math.min(Number(candidateK) || 20, 500)));
   if (filter) query = query.where(filter);
@@ -106,19 +126,24 @@ export async function retrieveVector(vector, {
   return query.toArray();
 }
 
-export async function maybeCreateVectorIndex() {
-  const table = await getTable();
+export async function maybeCreateVectorIndex(tableName = DEFAULT_TABLE_NAME) {
+  const table = await getTable(tableName);
   if (!table) return { created: false, reason: "table_missing" };
   const count = await table.countRows();
   if (count < 3000) return { created: false, reason: "not_enough_rows", count };
   const indices = await table.listIndices();
   if (indices.some((x) => x.name === "vector_idx")) return { created: false, reason: "exists", count };
   await table.createIndex("vector", { config: lancedb.Index.ivfPq({ distanceType: "cosine" }) });
-  return { created: true, count };
+  return { created: true, count, table: normalizeTableName(tableName) };
 }
 
 export async function lanceStats() {
-  const table = await getTable();
-  if (!table) return { rows: 0, indices: [] };
-  return { rows: await table.countRows(), indices: await table.listIndices() };
+  const table = await getTable(DEFAULT_TABLE_NAME);
+  const tables = [];
+  for (const name of await listTables()) {
+    const current = await getTable(name);
+    tables.push({ name, rows: await current.countRows(), indices: await current.listIndices() });
+  }
+  if (!table) return { rows: 0, indices: [], tables };
+  return { rows: await table.countRows(), indices: await table.listIndices(), tables };
 }

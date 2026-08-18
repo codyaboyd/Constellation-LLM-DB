@@ -10,7 +10,7 @@ import { computeEmbed, computeRerank, heartbeatPeers, linkPeer, nodeInfo, normal
 import { embeddingInfo, warmEmbedding } from "./services/embedding.js";
 import { rerankerInfo, warmReranker } from "./services/rerank.js";
 import { modelRuntimeInfo } from "./services/model-runtime.js";
-import { lanceStats, maybeCreateVectorIndex } from "./services/lance.js";
+import { lanceStats, listTables, maybeCreateVectorIndex } from "./services/lance.js";
 import { setSetting } from "./db/meta.js";
 
 const auth = await initAuth();
@@ -105,17 +105,21 @@ async function handler(req) {
     }
     if (req.method === "GET" && pathname === "/api/knowledge") {
       const check = requireAuth(req, auth); if (!check.ok) return denied(check);
-      return json({ documents: knowledgeList() });
+      return json({ documents: knowledgeList(url.searchParams.get("table") || url.searchParams.get("tableName") || url.searchParams.get("table_name") || undefined) });
+    }
+    if (req.method === "GET" && pathname === "/api/tables") {
+      const check = requireAuth(req, auth); if (!check.ok) return denied(check);
+      return json({ tables: await listTables() });
     }
     const chunksMatch = pathname.match(/^\/api\/knowledge\/([^/]+)\/chunks$/);
     if (req.method === "GET" && chunksMatch) {
       const check = requireAuth(req, auth); if (!check.ok) return denied(check);
-      return json(await knowledgeChunks(decodeURIComponent(chunksMatch[1])));
+      return json(await knowledgeChunks(decodeURIComponent(chunksMatch[1]), { tableName: url.searchParams.get("table") || url.searchParams.get("tableName") || url.searchParams.get("table_name") || undefined }));
     }
     if (req.method === "POST" && pathname === "/api/knowledge/manual") {
       const check = requireAuth(req, auth, { mutate: true }); if (!check.ok) return denied(check);
       const body = await bodyJson(req);
-      return json(await ingestText({ title: body.title || "Manual entry", text: body.text, sourceType: "manual", metadata: body.metadata || {}, chunkSize: body.chunkSize, overlap: body.overlap }), 201);
+      return json(await ingestText({ title: body.title || "Manual entry", text: body.text, sourceType: "manual", metadata: body.metadata || {}, chunkSize: body.chunkSize, overlap: body.overlap, tableName: body.tableName ?? body.table ?? body.table_name }), 201);
     }
     if (req.method === "POST" && pathname === "/api/knowledge/upload") {
       const check = requireAuth(req, auth, { mutate: true }); if (!check.ok) return denied(check);
@@ -123,7 +127,7 @@ async function handler(req) {
       const file = form.get("file");
       if (!(file instanceof File)) return json({ error: "file is required" }, 400);
       const parsed = await parseUpload(file);
-      const result = await ingestText({ title: String(form.get("title") || file.name), text: parsed.text, sourceType: parsed.sourceType, sourceUri: file.name, chunkSize: Number(form.get("chunkSize")) || 1200, overlap: Number(form.get("overlap")) || 180 });
+      const result = await ingestText({ title: String(form.get("title") || file.name), text: parsed.text, sourceType: parsed.sourceType, sourceUri: file.name, chunkSize: Number(form.get("chunkSize")) || 1200, overlap: Number(form.get("overlap")) || 180, tableName: form.get("tableName") || form.get("table") || form.get("table_name") || undefined });
       return json(result, 201);
     }
     if (req.method === "POST" && pathname === "/api/knowledge/crawl") {
@@ -131,13 +135,13 @@ async function handler(req) {
       const body = await bodyJson(req);
       const pages = await crawlSite(body.url, body);
       const results = [];
-      for (const page of pages) results.push(await ingestText({ title: page.title, text: page.text, sourceType: "web", sourceUri: page.url, metadata: { crawlRoot: body.url }, chunkSize: body.chunkSize, overlap: body.overlap }));
+      for (const page of pages) results.push(await ingestText({ title: page.title, text: page.text, sourceType: "web", sourceUri: page.url, metadata: { crawlRoot: body.url }, chunkSize: body.chunkSize, overlap: body.overlap, tableName: body.tableName ?? body.table ?? body.table_name }));
       return json({ pages: results.length, results }, 201);
     }
     const documentMatch = pathname.match(/^\/api\/knowledge\/([^/]+)$/);
     if (req.method === "GET" && documentMatch) {
       const check = requireAuth(req, auth); if (!check.ok) return denied(check);
-      return json(await knowledgeText(decodeURIComponent(documentMatch[1])));
+      return json(await knowledgeText(decodeURIComponent(documentMatch[1]), { tableName: url.searchParams.get("table") || url.searchParams.get("tableName") || url.searchParams.get("table_name") || undefined }));
     }
     if (req.method === "PUT" && documentMatch) {
       const check = requireAuth(req, auth, { mutate: true }); if (!check.ok) return denied(check);
@@ -150,7 +154,8 @@ async function handler(req) {
         sourceUri: body.sourceUri ?? body.source_uri,
         metadata: Object.hasOwn(body, "metadata") ? body.metadata : undefined,
         chunkSize: body.chunkSize,
-        overlap: body.overlap
+        overlap: body.overlap,
+        tableName: body.tableName ?? body.table ?? body.table_name
       }));
     }
     const deleteMatch = pathname.match(/^\/api\/knowledge\/([^/]+)$/);
@@ -162,7 +167,8 @@ async function handler(req) {
       const check = requireAuth(req, auth); if (!check.ok) return denied(check);
       const body = await bodyJson(req);
       if (!String(body.query || "").trim()) return json({ error: "A question is required." }, 400);
-      return json({ query: body.query, results: await queryKnowledge(body) });
+      const tableName = body.tableName ?? body.table ?? body.table_name ?? url.searchParams.get("table") ?? url.searchParams.get("tableName") ?? url.searchParams.get("table_name") ?? undefined;
+      return json({ query: body.query, tableName: tableName || "knowledge_chunks", results: await queryKnowledge({ ...body, tableName }) });
     }
     if (req.method === "POST" && pathname === "/api/embeddings") {
       const check = requireAuth(req, auth); if (!check.ok) return denied(check);
@@ -180,7 +186,8 @@ async function handler(req) {
     }
     if (req.method === "POST" && pathname === "/api/index/ensure") {
       const check = requireAuth(req, auth, { mutate: true }); if (!check.ok) return denied(check);
-      return json(await maybeCreateVectorIndex());
+      const body = await bodyJson(req);
+      return json(await maybeCreateVectorIndex(body.tableName ?? body.table ?? body.table_name));
     }
     if (req.method === "GET" && pathname === "/api/cluster/peers") {
       const check = requireAuth(req, auth); if (!check.ok) return denied(check);

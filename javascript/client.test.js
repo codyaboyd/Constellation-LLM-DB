@@ -63,6 +63,21 @@ test("query maps options, authentication, and response fields", async () => {
   });
 });
 
+test("query and ingestion can target an independent table", async () => {
+  const fetch = fakeFetch(
+    { body: { query: "private notes", table: "agent_memory", results: [] } },
+    { status: 201, body: { document: { id: "doc", title: "Notes", table_name: "agent_memory" }, chunks: 1 } }
+  );
+  const client = new Client({ baseUrl: "http://localhost:4317", apiKey: "secret", fetch });
+
+  const response = await client.query("private notes", { tableName: "agent_memory", rerank: false });
+  await client.ingestText("Notes", "Only this agent should retrieve these notes.", { table: "agent_memory" });
+
+  assert.equal(response.tableName, "agent_memory");
+  assert.equal(JSON.parse(fetch.calls[0].init.body).tableName, "agent_memory");
+  assert.equal(JSON.parse(fetch.calls[1].init.body).table, "agent_memory");
+});
+
 test("health is public and embed has a convenient single-input shape", async () => {
   const fetch = fakeFetch(
     { body: { ok: true, role: "standalone" } },

@@ -18,6 +18,7 @@ export interface Health {
 export interface Document {
   id: string;
   title: string;
+  tableName: string;
   sourceType: string;
   sourceUri: string;
   sha256: string | null;
@@ -49,6 +50,7 @@ export interface QueryResult {
 
 export interface QueryResponse {
   query: string;
+  tableName: string;
   results: QueryResult[];
 }
 
@@ -125,12 +127,16 @@ export interface QueryOptions extends RequestOptions {
   nprobes?: number;
   refineFactor?: number;
   distanceType?: string;
+  table?: string;
+  tableName?: string;
 }
 
 export interface IngestTextOptions extends RequestOptions {
   metadata?: Record<string, unknown>;
   chunkSize?: number;
   overlap?: number;
+  table?: string;
+  tableName?: string;
 }
 
 export interface UploadFileOptions extends RequestOptions {
@@ -138,6 +144,8 @@ export interface UploadFileOptions extends RequestOptions {
   title?: string;
   chunkSize?: number;
   overlap?: number;
+  table?: string;
+  tableName?: string;
 }
 
 export interface CrawlOptions extends RequestOptions {
@@ -146,6 +154,8 @@ export interface CrawlOptions extends RequestOptions {
   sameOrigin?: boolean;
   chunkSize?: number;
   overlap?: number;
+  table?: string;
+  tableName?: string;
 }
 
 export interface ReplaceDocumentOptions extends RequestOptions {
@@ -155,6 +165,8 @@ export interface ReplaceDocumentOptions extends RequestOptions {
   metadata?: Record<string, unknown>;
   chunkSize?: number;
   overlap?: number;
+  table?: string;
+  tableName?: string;
 }
 
 export class ConstellationError extends Error {}
@@ -193,6 +205,8 @@ export class ConstellationClient {
   rerank(query: string, documents: Array<string | Record<string, unknown>>, options?: RequestOptions & { topN?: number; returnDocuments?: boolean }): Promise<RerankResponse>;
   listDocuments(options?: RequestOptions): Promise<Document[]>;
   documents(options?: RequestOptions): Promise<Document[]>;
+  listTables(options?: RequestOptions): Promise<string[]>;
+  tables(options?: RequestOptions): Promise<string[]>;
   ingestText(title: string, text: string, options?: IngestTextOptions): Promise<IngestResult>;
   uploadFile(file: Blob | Uint8Array | string | { arrayBuffer(): Promise<ArrayBuffer>; name?: string }, options?: UploadFileOptions): Promise<IngestResult>;
   crawl(url: string, options?: CrawlOptions): Promise<CrawlResponse>;
@@ -203,7 +217,7 @@ export class ConstellationClient {
   replaceDocument(identifier: string, text: string, options?: ReplaceDocumentOptions): Promise<IngestResult>;
   replaceKnowledge(identifier: string, text: string, options?: ReplaceDocumentOptions): Promise<IngestResult>;
   deleteDocument(documentId: string, options?: RequestOptions): Promise<Record<string, unknown>>;
-  ensureIndex(options?: RequestOptions): Promise<Record<string, unknown>>;
+  ensureIndex(options?: RequestOptions & { table?: string; tableName?: string }): Promise<Record<string, unknown>>;
   listPeers(options?: RequestOptions): Promise<Peer[]>;
   addPeer(url: string, options?: RequestOptions & { priority?: number }): Promise<Peer>;
   syncPeer(peerId: string, options?: RequestOptions): Promise<Record<string, unknown>>;

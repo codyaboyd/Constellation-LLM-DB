@@ -690,6 +690,14 @@ label {
 }
 
 @media (max-width: 575px) {
+  .tab-pane-custom[data-pane="overview"] > .d-flex:first-child {
+    flex-wrap: wrap;
+  }
+
+  .tab-pane-custom[data-pane="overview"] > .d-flex:first-child > .d-flex {
+    width: 100%;
+  }
+
   .list-group {
     grid-template-columns: repeat(3, 1fr);
   }
